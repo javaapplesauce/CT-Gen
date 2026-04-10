@@ -30,7 +30,7 @@ from transformers import (
 )
 from peft import get_peft_model, LoraConfig, TaskType
 from accelerate import Accelerator, FullyShardedDataParallelPlugin
-from torch.distributed.fsdp import ShardingStrategy, BackwardPrefetch
+from torch.distributed.fsdp import ShardingStrategy, BackwardPrefetch, FullyShardedDataParallel as FSDP_class
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
 
@@ -429,31 +429,71 @@ def load_llm_and_tokenizer(model_id: str, visual_start_token: str, visual_end_to
     return llm, tokenizer
 
 
-def build_multimodal_embeds(llm, visual_tokens, input_ids,
-                            visual_start_id, visual_end_id,
-                            n_visual_tokens):
+class MultimodalLLM(nn.Module):
     """
-    Prepend [<|visual_start|> V_1..V_N <|visual_end|>] to text tokens.
-
-    Returns:
-        embeds: (B, 2+N+L, LLM_DIM)
-        labels: (B, 2+N+L) with -100 for visual prefix
+    Wraps the LLM so that visual token injection and embedding lookups happen
+    inside a single forward() call.  Required for FSDP compatibility: with
+    FULL_SHARD the embedding weight is sharded and only gathered inside an
+    FSDP forward context — calling get_input_embeddings() outside forward()
+    yields a 1-D shard that torch.nn.functional.embedding rejects.
     """
-    B = visual_tokens.size(0)
-    emb = llm.get_input_embeddings()
 
-    start_emb   = emb(torch.full((B, 1), visual_start_id, device=visual_tokens.device))
-    end_emb     = emb(torch.full((B, 1), visual_end_id,   device=visual_tokens.device))
-    text_embeds = emb(input_ids)
+    def __init__(self, llm):
+        super().__init__()
+        self.llm = llm
 
-    embeds = torch.cat([start_emb, visual_tokens, end_emb, text_embeds], dim=1)
+    def forward(self, visual_tokens, input_ids,
+                visual_start_id: int, visual_end_id: int,
+                n_visual_tokens: int, labels=None):
+        B   = visual_tokens.size(0)
+        dev = visual_tokens.device
+        emb = self.llm.get_input_embeddings()
 
-    prefix_len    = 1 + n_visual_tokens + 1
-    labels_prefix = torch.full((B, prefix_len), -100, device=visual_tokens.device)
-    labels_text   = input_ids.clone()
-    labels        = torch.cat([labels_prefix, labels_text], dim=1)
+        start_emb   = emb(torch.full((B, 1), visual_start_id, dtype=torch.long, device=dev))
+        end_emb     = emb(torch.full((B, 1), visual_end_id,   dtype=torch.long, device=dev))
+        text_embeds = emb(input_ids)
 
-    return embeds, labels
+        embeds = torch.cat([start_emb, visual_tokens, end_emb, text_embeds], dim=1)
+        attn   = torch.ones(B, embeds.size(1), dtype=torch.long, device=dev)
+
+        full_labels = None
+        if labels is not None:
+            prefix      = torch.full((B, 1 + n_visual_tokens + 1), -100, device=dev)
+            full_labels = torch.cat([prefix, labels], dim=1)
+
+        return self.llm(inputs_embeds=embeds, attention_mask=attn, labels=full_labels)
+
+    # ── generation: embedding lookup needs summon_full_params because it
+    # happens before llm.generate()'s own forward context starts. ────────────
+    def generate(self, visual_tokens, instruct_ids, prefix_ids,
+                 visual_start_id: int, visual_end_id: int, **gen_kwargs):
+        B   = visual_tokens.size(0)
+        dev = visual_tokens.device
+
+        # summon_full_params materialises the root FSDP unit's params (which
+        # includes the embedding) on all ranks for the duration of the block.
+        ctx = (FSDP_class.summon_full_params(self, writeback=False, recurse=False)
+               if isinstance(self, FSDP_class) else torch.no_grad())
+        with ctx:
+            emb       = self.llm.get_input_embeddings()
+            start_emb = emb(torch.full((B, 1), visual_start_id, dtype=torch.long, device=dev))
+            end_emb   = emb(torch.full((B, 1), visual_end_id,   dtype=torch.long, device=dev))
+            input_embeds = torch.cat(
+                [start_emb, visual_tokens, end_emb, emb(instruct_ids), emb(prefix_ids)],
+                dim=1,
+            )
+
+        return self.llm.generate(inputs_embeds=input_embeds, **gen_kwargs)
+
+    def gradient_checkpointing_enable(self, **kw):
+        self.llm.gradient_checkpointing_enable(**kw)
+
+    def print_trainable_parameters(self):
+        self.llm.print_trainable_parameters()
+
+    @property
+    def config(self):
+        return self.llm.config
 
 
 def train_stage1(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
@@ -530,18 +570,12 @@ def train_stage1(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
 
             visual_embeds = projector(raw_tokens.to(torch.bfloat16))
 
-            embeds, labels = build_multimodal_embeds(
-                llm, visual_embeds, input_ids,
-                visual_start_id, visual_end_id, nvt,
-            )
+            s1_labels = input_ids.clone()
+            s1_labels[input_ids == pad_id] = -100
 
-            pad_mask = (input_ids == pad_id)
-            labels[:, -input_ids.size(1):][pad_mask] = -100
-
-            attn = torch.ones(embeds.size(0), embeds.size(1),
-                              dtype=torch.long, device=embeds.device)
-
-            outputs = llm(inputs_embeds=embeds, attention_mask=attn, labels=labels)
+            outputs = llm(visual_embeds, input_ids,
+                          visual_start_id, visual_end_id, nvt,
+                          labels=s1_labels)
             loss    = outputs.loss / s1.accum_steps
 
             accelerator.backward(loss)
@@ -575,16 +609,13 @@ def train_stage1(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
 
                 raw_tokens    = visual_encoder(volume, return_encoded_tokens=True)
                 visual_embeds = projector(raw_tokens.to(torch.bfloat16))
-                embeds, labels = build_multimodal_embeds(
-                    llm, visual_embeds, input_ids,
-                    visual_start_id, visual_end_id, nvt,
-                )
-                pad_mask = (input_ids == pad_id)
-                labels[:, -input_ids.size(1):][pad_mask] = -100
-                attn = torch.ones(embeds.size(0), embeds.size(1),
-                                  dtype=torch.long, device=embeds.device)
 
-                out     = llm(inputs_embeds=embeds, attention_mask=attn, labels=labels)
+                s1_labels = input_ids.clone()
+                s1_labels[input_ids == pad_id] = -100
+
+                out      = llm(visual_embeds, input_ids,
+                               visual_start_id, visual_end_id, nvt,
+                               labels=s1_labels)
                 val_loss += out.loss.item()
                 val_n   += 1
 
@@ -618,7 +649,7 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
     # Stage 1 just finished in-memory; the trained projector is live here.
     # LoRA was already attached to the LLM in main() (before FSDP wrap).
     # Unfreeze LoRA params; base model stays frozen.
-    lora_params = [p for n, p in llm.named_parameters() if "lora_" in n]
+    lora_params = [p for n, p in llm.named_parameters() if "lora_" in n.lower()]
     if not lora_params:
         raise RuntimeError(
             "No LoRA parameters found on llm — was LoRA applied in main()?"
@@ -699,21 +730,10 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
                 raw_tokens = visual_encoder(volume, return_encoded_tokens=True)
 
             visual_embeds = projector(raw_tokens.to(torch.bfloat16))
-            embeds, _ = build_multimodal_embeds(
-                llm, visual_embeds, input_ids,
-                visual_start_id, visual_end_id, nvt,
-            )
 
-            vis_prefix = torch.full(
-                (input_ids.size(0), 1 + nvt + 1), -100,
-                device=input_ids.device,
-            )
-            full_labels = torch.cat([vis_prefix, labels], dim=1)
-
-            attn = torch.ones(embeds.size(0), embeds.size(1),
-                              dtype=torch.long, device=embeds.device)
-
-            outputs = llm(inputs_embeds=embeds, attention_mask=attn, labels=full_labels)
+            outputs = llm(visual_embeds, input_ids,
+                          visual_start_id, visual_end_id, nvt,
+                          labels=labels)
             loss    = outputs.loss / s2.accum_steps
 
             accelerator.backward(loss)
@@ -753,19 +773,10 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
 
                 raw_tokens    = visual_encoder(volume, return_encoded_tokens=True)
                 visual_embeds = projector(raw_tokens.to(torch.bfloat16))
-                embeds, _ = build_multimodal_embeds(
-                    llm, visual_embeds, input_ids,
-                    visual_start_id, visual_end_id, nvt,
-                )
-                vis_prefix  = torch.full(
-                    (input_ids.size(0), 1 + nvt + 1), -100,
-                    device=input_ids.device,
-                )
-                full_labels = torch.cat([vis_prefix, labels], dim=1)
-                attn        = torch.ones(embeds.size(0), embeds.size(1),
-                                         dtype=torch.long, device=embeds.device)
 
-                out     = llm(inputs_embeds=embeds, attention_mask=attn, labels=full_labels)
+                out      = llm(visual_embeds, input_ids,
+                               visual_start_id, visual_end_id, nvt,
+                               labels=labels)
                 val_loss += out.loss.item()
                 val_n   += 1
 
@@ -802,28 +813,20 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
             )["input_ids"].to(accelerator.device)
 
             # All FSDP ranks must participate in every forward/generate call.
-            # Sync before entering the generation loop so no rank is mid-step.
             accelerator.wait_for_everyone()
             with torch.no_grad():
                 for mbatch in metric_loader:
                     volume   = mbatch["volume"].to(accelerator.device, dtype=torch.float32)
-                    ref_text = mbatch["report"][0]   # list of 1 str from collate
+                    ref_text = mbatch["report"][0]
 
-                    raw_tok  = visual_encoder(volume, return_encoded_tokens=True)
-                    vis_emb  = projector(raw_tok.to(torch.bfloat16))
+                    raw_tok = visual_encoder(volume, return_encoded_tokens=True)
+                    vis_emb = projector(raw_tok.to(torch.bfloat16))
 
-                    # Access embeddings inside no_grad so FSDP all-gathers are
-                    # correctly triggered in the right context on all ranks.
-                    emb = llm.get_input_embeddings()
-                    start_emb = emb(torch.tensor([[visual_start_id]], device=accelerator.device))
-                    end_emb   = emb(torch.tensor([[visual_end_id]],   device=accelerator.device))
-                    input_embeds = torch.cat(
-                        [start_emb, vis_emb, end_emb,
-                         emb(instruct_ids_tmpl), emb(prefix_ids)], dim=1
-                    )
-
+                    # MultimodalLLM.generate() handles summon_full_params
+                    # internally so the embedding lookup is FSDP-safe.
                     out_ids = llm.generate(
-                        inputs_embeds=input_embeds,
+                        vis_emb, instruct_ids_tmpl, prefix_ids,
+                        visual_start_id, visual_end_id,
                         max_new_tokens=cfg.eval.max_tokens,
                         do_sample=False,
                         temperature=1.0,
@@ -835,7 +838,6 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
                         gen_texts.append(tokenizer.decode(out_ids[0], skip_special_tokens=True))
                         ref_texts.append(ref_text)
 
-            # Sync after generation before resuming distributed training steps.
             accelerator.wait_for_everyone()
             llm.config.use_cache = False   # restore for training
 
@@ -986,10 +988,10 @@ def main(cfg: DictConfig):
     llm.gradient_checkpointing_enable()
     if accelerator.is_main_process:
         llm.print_trainable_parameters()
-    # Intentionally leave LoRA params trainable at FSDP wrap time — Stage 1
-    # freezes them, Stage 2 re-enables. With use_orig_params=True this
-    # toggle-down-then-up pattern is the path commonly exercised by
-    # FSDP + PEFT configurations.
+
+    # Wrap in MultimodalLLM so embedding lookups happen inside forward(),
+    # which is the only FSDP-safe context for accessing sharded weights.
+    llm = MultimodalLLM(llm)
 
     visual_start_id = tokenizer.convert_tokens_to_ids(cfg.tokens.visual_start)
     visual_end_id   = tokenizer.convert_tokens_to_ids(cfg.tokens.visual_end)
