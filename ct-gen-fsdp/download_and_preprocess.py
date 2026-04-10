@@ -21,8 +21,8 @@ import os
 import sys
 import glob
 import shutil
-import subprocess
 import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 
 import hydra
@@ -84,51 +84,23 @@ def _preprocess_one(args):
         return (vn, str(e))
 
 
-def _download_chunk(chunk, base_url, hf_token):
-    """Download a chunk of volumes via aria2c (fire-and-forget; caller checks disk)."""
-    url_file = "/tmp/aria2_urls.txt"
-    all_dirs = set()
-    entries  = []
+def _download_chunk(chunk, repo_id, raw_dir, hf_token):
+    """Download a chunk of volumes via hf_hub_download (handles XetHub CDN)."""
+    def _dl_one(item):
+        vn, hf_path, raw_path, pt_path = item
+        os.makedirs(os.path.dirname(raw_path), exist_ok=True)
+        hf_hub_download(
+            repo_id=repo_id,
+            filename=hf_path,
+            repo_type="dataset",
+            token=hf_token,
+            local_dir=raw_dir,
+        )
 
-    for vn, hf_path, raw_path, pt_path in chunk:
-        all_dirs.add(os.path.dirname(raw_path))
-        entries.append((f"{base_url}/{hf_path}", raw_path))
-
-    for d in all_dirs:
-        os.makedirs(d, exist_ok=True)
-
-    # aria2c's `out=` must be a filename only — directory components are
-    # set via `dir=`.  Writing a full absolute path to `out=` causes aria2c
-    # to treat the whole string as a relative filename and save to CWD.
-    with open(url_file, "w") as f:
-        for url, dest in entries:
-            f.write(
-                f"{url}\n"
-                f"  dir={os.path.dirname(dest)}\n"
-                f"  out={os.path.basename(dest)}\n"
-                f"  header=Authorization: Bearer {hf_token}\n"
-            )
-
-    cmd = [
-        "aria2c",
-        "--input-file",                url_file,
-        "--max-concurrent-downloads",  "64",
-        "--split",                     "16",
-        "--min-split-size",            "1M",
-        "--max-connection-per-server", "16",
-        "--file-allocation",           "none",
-        "--disk-cache",                "512M",
-        "--no-conf",
-        "--allow-overwrite",           "true",
-        "--auto-file-renaming",        "false",
-        "--max-tries",                 "5",
-        "--retry-wait",                "3",
-        "--connect-timeout",           "30",
-        "--timeout",                   "600",
-        "--summary-interval",          "15",
-        "--console-log-level",         "warn",
-    ]
-    subprocess.run(cmd, check=True)
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        futures = {executor.submit(_dl_one, item): item[0] for item in chunk}
+        for future in as_completed(futures):
+            future.result()  # re-raise any download exception
 
 
 @hydra.main(config_path="conf", config_name="config", version_base=None)
@@ -221,7 +193,6 @@ def main(cfg: DictConfig):
         return
 
     # Streaming chunked pipeline
-    base_url   = f"https://huggingface.co/datasets/{repo_id}/resolve/main"
     num_chunks = (len(work) + chunk_size - 1) // chunk_size
     total_ok   = 0
     total_fail = 0
@@ -253,7 +224,7 @@ def main(cfg: DictConfig):
 
         if to_download:
             print(f"  Downloading {len(to_download)} volumes...")
-            _download_chunk(to_download, base_url, hf_token)
+            _download_chunk(to_download, repo_id, raw_dir, hf_token)
         if already_raw:
             print(f"  {len(already_raw)} volumes already downloaded (raw on disk)")
 
