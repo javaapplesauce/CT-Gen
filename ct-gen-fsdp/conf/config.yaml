@@ -1,0 +1,88 @@
+paths:
+  base_dir: ${oc.env:CTGEN_BASE,/home/ubuntu/ctgen}
+  ct_clip_dir: ${paths.base_dir}/CT-CLIP
+  ct_clip_weights: ${paths.base_dir}/models/CT-CLIP_v2.pt
+  pt_dir: ${paths.base_dir}/data/ct_rate_pt
+  raw_dir: ${paths.base_dir}/data/ct_rate_raw
+  ckpt_dir: ${paths.base_dir}/ckpts
+
+model:
+  llm_id: google/gemma-3-4b-it
+  llm_hidden_dim: 2560
+
+  # CTViT token geometry (40-slice preprocessing)
+  visual_token_dim: 512
+  ctvit_t: 4
+  ctvit_h: 24
+  ctvit_w: 24
+  target_t: 4
+  target_s: 8
+  # Derived: num_visual_tokens = target_t * target_s * target_s = 256
+
+  # LoRA — r=32/alpha=64 for a full training run
+  lora_r: 32
+  lora_alpha: 64
+  lora_dropout: 0.05
+  lora_target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
+
+# Stage 1: projector-only alignment
+stage1:
+  epochs: 3
+  lr: 2e-4
+  batch_size: 1
+  accum_steps: 8        # effective batch = batch_size × accum × n_gpus
+  log_every: 50
+
+# Stage 2: instruction tuning (projector + LoRA)
+stage2:
+  epochs: 8
+  lr: 2e-4              # projector LR; LoRA LR = lr × 0.1 = 2e-5
+  batch_size: 1
+  accum_steps: 8
+  log_every: 50
+
+data:
+  test_split: 0.05
+  val_split: 0.08       # ~8% of train+val for validation
+  num_workers: 4        # 4 workers; set to 0 if tokenizer is not picklable
+
+  repo_id: ibrahimhamamci/CT-RATE
+  reports_hf_path: dataset/radiology_text_reports/validation_reports.csv
+  train_reports_hf_path: dataset/radiology_text_reports/train_reports.csv
+  volume_limit: null    # null = all volumes
+  chunk_size: 50
+  preprocess_workers: 0
+
+instruction: >-
+  The CT scan has been encoded as visual feature tokens above.
+  Write a structured radiological report based on these features.
+  Include Findings and Impression sections. Do not ask for additional input.
+
+tokens:
+  visual_start: "<|visual_start|>"
+  visual_end: "<|visual_end|>"
+
+eval:
+  checkpoint: stage2/best
+  max_tokens: 512
+  val_metric_samples: 50   # reports generated per validation epoch (0 = disable)
+
+wandb:
+  project: ${oc.env:WANDB_PROJECT,ct-gen-vlm}
+
+inference:
+  max_tokens: 300
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false
