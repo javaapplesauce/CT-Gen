@@ -453,15 +453,17 @@ class MultimodalLLM(nn.Module):
         end_emb     = emb(torch.full((B, 1), visual_end_id,   dtype=torch.long, device=dev))
         text_embeds = emb(input_ids)
 
-        embeds = torch.cat([start_emb, visual_tokens, end_emb, text_embeds], dim=1)
-        attn   = torch.ones(B, embeds.size(1), dtype=torch.long, device=dev)
+        embeds         = torch.cat([start_emb, visual_tokens, end_emb, text_embeds], dim=1)
+        attn           = torch.ones(B, embeds.size(1), dtype=torch.long, device=dev)
+        token_type_ids = torch.zeros(B, embeds.size(1), dtype=torch.long, device=dev)
 
         full_labels = None
         if labels is not None:
             prefix      = torch.full((B, 1 + n_visual_tokens + 1), -100, device=dev)
             full_labels = torch.cat([prefix, labels], dim=1)
 
-        return self.llm(inputs_embeds=embeds, attention_mask=attn, labels=full_labels)
+        return self.llm(inputs_embeds=embeds, attention_mask=attn,
+                        token_type_ids=token_type_ids, labels=full_labels)
 
     # ── generation: embedding lookup needs summon_full_params because it
     # happens before llm.generate()'s own forward context starts. ────────────
