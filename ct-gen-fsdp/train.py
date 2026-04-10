@@ -625,14 +625,15 @@ def train_stage1(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
             print(f"[S1 E{epoch}] val_loss={val_loss:.4f}")
             wandb.log({"s1/val_loss": val_loss, "s1/epoch": epoch,
                         "s1/step": global_step})
-            if val_loss < best_val:
-                best_val = val_loss
-                accelerator.save_state(os.path.join(ckpt_dir, "best"))
+        if val_loss < best_val:
+            best_val = val_loss
+            accelerator.save_state(os.path.join(ckpt_dir, "best"))  # collective: all ranks
+            if accelerator.is_main_process:
                 print(f"  -> Best checkpoint (val_loss={best_val:.4f})")
 
     accelerator.wait_for_everyone()
+    accelerator.save_state(os.path.join(ckpt_dir, "final"))  # collective: all ranks
     if accelerator.is_main_process:
-        accelerator.save_state(os.path.join(ckpt_dir, "final"))
         wandb.log({"s1/best_val_loss": best_val})
         wandb.finish()
         print("Stage 1 complete.")
@@ -866,14 +867,15 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
         if accelerator.is_main_process:
             wandb.log({"s2/val_loss": val_loss, "s2/epoch": epoch,
                         "s2/step": global_step})
-            if val_loss < best_val:
-                best_val = val_loss
-                accelerator.save_state(os.path.join(ckpt_dir, "best"))
+        if val_loss < best_val:
+            best_val = val_loss
+            accelerator.save_state(os.path.join(ckpt_dir, "best"))  # collective: all ranks
+            if accelerator.is_main_process:
                 print(f"  -> Best S2 checkpoint (val_loss={best_val:.4f})")
 
     accelerator.wait_for_everyone()
+    accelerator.save_state(os.path.join(ckpt_dir, "final"))  # collective: all ranks
     if accelerator.is_main_process:
-        accelerator.save_state(os.path.join(ckpt_dir, "final"))
         wandb.log({"s2/best_val_loss": best_val})
         wandb.finish()
         print("Stage 2 complete.")
