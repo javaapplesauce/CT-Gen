@@ -978,6 +978,11 @@ def main(cfg: DictConfig):
         bias="none",
     )
     llm = get_peft_model(llm, lora_cfg)
+    # PEFT initialises LoRA weights in float32; cast to bf16 to match the
+    # frozen base model — FSDP requires uniform dtype within each sharded unit.
+    for param in llm.parameters():
+        if param.requires_grad:
+            param.data = param.data.to(torch.bfloat16)
     llm.gradient_checkpointing_enable()
     if accelerator.is_main_process:
         llm.print_trainable_parameters()
@@ -991,7 +996,7 @@ def main(cfg: DictConfig):
 
     if accelerator.is_main_process:
         print("Building CTGenAggregator...")
-    projector = build_aggregator(cfg)
+    projector = build_aggregator(cfg).to(torch.bfloat16)
 
     # SINGLE FSDP wrap for projector + llm. Never re-prepare these models.
     # Per-stage optimizers/schedulers/loaders are prepared inside the stages.
