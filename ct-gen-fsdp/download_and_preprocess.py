@@ -23,7 +23,6 @@ import glob
 import shutil
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
 
 import hydra
 import pandas as pd
@@ -68,7 +67,6 @@ def vol_name_to_hf_path(name: str) -> str:
     return f"dataset/valid_fixed/{patient}/{series}/{name}.nii.gz"
 
 
-# Worker function for parallel preprocessing
 def _preprocess_one(args):
     """Preprocess a single NIfTI → float16 .pt. Runs in a worker process."""
     vn, raw_path, pt_path = args
@@ -81,7 +79,12 @@ def _preprocess_one(args):
         torch.save(tensor, pt_path)
         return (vn, None)
     except Exception as e:
-        return (vn, str(e))
+        # Walk the cause chain to surface the root error, not just the MONAI wrapper.
+        root = e
+        while root.__cause__ is not None:
+            root = root.__cause__
+        msg = f"{type(root).__name__}: {root}" if root is not e else repr(e)
+        return (vn, msg)
 
 
 def _download_chunk(chunk, repo_id, raw_dir, hf_token):
@@ -90,14 +93,11 @@ def _download_chunk(chunk, repo_id, raw_dir, hf_token):
         vn, hf_path, raw_path, pt_path = item
         os.makedirs(os.path.dirname(raw_path), exist_ok=True)
         hf_hub_download(
-            repo_id=repo_id,
-            filename=hf_path,
-            repo_type="dataset",
-            token=hf_token,
-            local_dir=raw_dir,
+            repo_id=repo_id, filename=hf_path,
+            repo_type="dataset", token=hf_token, local_dir=raw_dir,
         )
 
-    with ThreadPoolExecutor(max_workers=16) as executor:
+    with ThreadPoolExecutor(max_workers=32) as executor:
         futures = {executor.submit(_dl_one, item): item[0] for item in chunk}
         for future in as_completed(futures):
             future.result()  # re-raise any download exception
@@ -107,19 +107,17 @@ def _download_chunk(chunk, repo_id, raw_dir, hf_token):
 def main(cfg: DictConfig):
     OmegaConf.resolve(cfg)
 
-    raw_dir         = cfg.paths.raw_dir
-    pt_dir          = cfg.paths.pt_dir
-    models_dir      = os.path.dirname(cfg.paths.ct_clip_weights)
-    ct_clip_weights = cfg.paths.ct_clip_weights
+    raw_dir          = cfg.paths.raw_dir
+    pt_dir           = cfg.paths.pt_dir
+    models_dir       = os.path.dirname(cfg.paths.ct_clip_weights)
+    ct_clip_weights  = cfg.paths.ct_clip_weights
     repo_id          = cfg.data.repo_id
     reports_hf_paths = [cfg.data.reports_hf_path]
-    # Also pull training reports when the key exists (full CT-RATE dataset)
     train_hf = getattr(cfg.data, "train_reports_hf_path", None)
     if train_hf:
         reports_hf_paths.append(train_hf)
-    volume_limit    = cfg.data.volume_limit
-    chunk_size      = cfg.data.chunk_size
-    prep_workers    = cfg.data.preprocess_workers
+    volume_limit = cfg.data.volume_limit
+    chunk_size   = cfg.data.chunk_size
 
     hf_token = os.environ.get("HF_TOKEN", "")
     if not hf_token:
@@ -130,7 +128,7 @@ def main(cfg: DictConfig):
     for d in [raw_dir, pt_dir, models_dir]:
         os.makedirs(d, exist_ok=True)
 
-    num_workers = prep_workers or min(mp.cpu_count(), 32)
+    num_workers = min(mp.cpu_count(), 64)
     print(f"Preprocessing workers: {num_workers}")
 
     # CT-CLIP weights
@@ -149,7 +147,7 @@ def main(cfg: DictConfig):
     else:
         print(f"CT-CLIP weights present: {ct_clip_weights}")
 
-    # Reports CSVs (validation + optional training split)
+    # Reports CSVs
     frames = []
     for hf_path in reports_hf_paths:
         local_csv = os.path.join(raw_dir, hf_path)
@@ -159,7 +157,6 @@ def main(cfg: DictConfig):
                 repo_id=repo_id, filename=hf_path,
                 repo_type="dataset", token=hf_token, local_dir=raw_dir,
             )
-        print(f"  Reports CSV: {local_csv}")
         frames.append(pd.read_csv(local_csv))
 
     df = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
@@ -171,7 +168,7 @@ def main(cfg: DictConfig):
     )
     if volume_limit:
         vol_names = vol_names[:volume_limit]
-    print(f"  Total volumes in dataset: {len(vol_names)}")
+    print(f"Total volumes: {len(vol_names)}")
 
     # Build work list (skip already-processed)
     work = []
@@ -185,106 +182,96 @@ def main(cfg: DictConfig):
 
     already_done = len(vol_names) - len(work)
     if already_done:
-        print(f"  Already preprocessed: {already_done}")
+        print(f"Already preprocessed: {already_done}  |  Remaining: {len(work)}")
 
     if not work:
         print("All volumes already preprocessed.")
         _print_summary(pt_dir, raw_dir)
         return
 
-    # Streaming chunked pipeline
     num_chunks = (len(work) + chunk_size - 1) // chunk_size
+    print(f"\nStreaming pipeline: {len(work)} volumes in {num_chunks} chunks of {chunk_size}\n")
+
     total_ok   = 0
     total_fail = 0
 
-    print(f"\nStreaming pipeline: {len(work)} volumes in {num_chunks} chunks "
-          f"of {chunk_size}")
-    print(f"  Peak raw disk per chunk: ~{chunk_size} GB")
-    print(f"  Raw NIfTIs auto-deleted after each chunk\n")
+    # Background executor for pre-fetching the next chunk while preprocessing runs.
+    dl_executor = ThreadPoolExecutor(max_workers=1)
+
+    def _submit_download(chunk_work):
+        to_dl = [item for item in chunk_work
+                 if not (os.path.exists(item[2]) and os.path.getsize(item[2]) > 0)]
+        if to_dl:
+            return dl_executor.submit(_download_chunk, to_dl, repo_id, raw_dir, hf_token)
+        return None
+
+    # Pre-fetch first chunk before the loop starts.
+    next_future = _submit_download(work[:chunk_size])
 
     for chunk_idx in range(num_chunks):
         start = chunk_idx * chunk_size
         end   = min(start + chunk_size, len(work))
         chunk = work[start:end]
 
-        print(f"── Chunk {chunk_idx + 1}/{num_chunks} "
-              f"({len(chunk)} volumes) ──")
+        print(f"── Chunk {chunk_idx + 1}/{num_chunks} ({len(chunk)} volumes) ──")
 
-        # Download
-        # Separate volumes that already have raw files on disk (e.g. from
-        # a previous interrupted run) from those that need downloading.
-        to_download = []
-        already_raw = []
-        for item in chunk:
-            vn, hf_path, raw_path, pt_path = item
-            if os.path.exists(raw_path) and os.path.getsize(raw_path) > 0:
-                already_raw.append(item)
-            else:
-                to_download.append(item)
+        # Wait for this chunk's download to finish.
+        if next_future is not None:
+            next_future.result()
 
-        if to_download:
-            print(f"  Downloading {len(to_download)} volumes...")
-            _download_chunk(to_download, repo_id, raw_dir, hf_token)
-        if already_raw:
-            print(f"  {len(already_raw)} volumes already downloaded (raw on disk)")
+        # Kick off next chunk download in background while we preprocess this one.
+        if end < len(work):
+            next_future = _submit_download(work[end:min(end + chunk_size, len(work))])
+        else:
+            next_future = None
 
-        # Preprocess in parallel
-        # Re-check which raw files actually exist after download
-        preprocess_args = []
-        for vn, hf_path, raw_path, pt_path in chunk:
-            if os.path.exists(raw_path) and os.path.getsize(raw_path) > 0:
-                preprocess_args.append((vn, raw_path, pt_path))
+        preprocess_args = [
+            (vn, raw_path, pt_path)
+            for vn, hf_path, raw_path, pt_path in chunk
+            if os.path.exists(raw_path) and os.path.getsize(raw_path) > 0
+        ]
 
         if preprocess_args:
-            print(f"  Preprocessing {len(preprocess_args)} volumes "
-                  f"({num_workers} workers)...")
             with mp.Pool(num_workers) as pool:
                 results = list(tqdm(
                     pool.imap_unordered(_preprocess_one, preprocess_args),
                     total=len(preprocess_args),
                     desc=f"  Chunk {chunk_idx + 1}",
                 ))
-
             ok   = sum(1 for _, err in results if err is None)
             fail = [(vn, err) for vn, err in results if err is not None]
             total_ok   += ok
             total_fail += len(fail)
-            print(f"  Preprocessed: {ok} ok, {len(fail)} failed")
             if fail:
+                print(f"  {len(fail)} failed:")
                 for vn, err in fail[:5]:
-                    print(f"    FAIL: {vn}: {err}")
+                    print(f"    {vn}: {err}")
 
-        # Delete raw NIfTIs for this chunk
-        deleted = 0
+        # Delete raw NIfTIs for this chunk.
         for vn, hf_path, raw_path, pt_path in chunk:
             if os.path.exists(raw_path):
                 os.remove(raw_path)
-                deleted += 1
-            # Clean up empty parent directories
             parent = os.path.dirname(raw_path)
-            for _ in range(3):  # up to 3 levels
+            for _ in range(3):
                 try:
-                    os.rmdir(parent)  # only removes if empty
+                    os.rmdir(parent)
                     parent = os.path.dirname(parent)
                 except OSError:
                     break
-        if deleted:
-            print(f"  Deleted {deleted} raw NIfTI files")
-        print()
 
-    print(f"Pipeline complete: {total_ok} preprocessed, {total_fail} failed")
+    dl_executor.shutdown(wait=False)
+    print(f"\nPipeline complete: {total_ok} preprocessed, {total_fail} failed")
     _print_summary(pt_dir, raw_dir)
 
 
 def _print_summary(pt_dir, raw_dir):
-    pt_files = glob.glob(os.path.join(pt_dir, "*.pt"))
-    pt_bytes = sum(os.path.getsize(p) for p in pt_files)
+    pt_files  = glob.glob(os.path.join(pt_dir, "*.pt"))
+    pt_bytes  = sum(os.path.getsize(p) for p in pt_files)
     raw_files = glob.glob(os.path.join(raw_dir, "**", "*.nii.gz"), recursive=True)
     raw_bytes = sum(os.path.getsize(p) for p in raw_files)
     print(f"\nPreprocessed: {len(pt_files)} tensors  |  {pt_bytes / 1e9:.1f} GB")
     if raw_bytes:
-        print(f"Residual raw NIfTIs: {len(raw_files)} files  |  "
-              f"{raw_bytes / 1e9:.1f} GB")
+        print(f"Residual raw NIfTIs: {len(raw_files)} files  |  {raw_bytes / 1e9:.1f} GB")
     else:
         print("No raw NIfTIs on disk (all cleaned up)")
 
