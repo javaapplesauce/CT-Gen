@@ -13,6 +13,7 @@ import sys
 import json
 import glob
 import functools
+from contextlib import nullcontext
 
 import nltk
 import hydra
@@ -465,27 +466,9 @@ class MultimodalLLM(nn.Module):
         return self.llm(inputs_embeds=embeds, attention_mask=attn,
                         token_type_ids=token_type_ids, labels=full_labels)
 
-    # ── generation: embedding lookup needs summon_full_params because it
-    # happens before llm.generate()'s own forward context starts. ────────────
-    def generate(self, visual_tokens, instruct_ids, prefix_ids,
-                 visual_start_id: int, visual_end_id: int, **gen_kwargs):
-        B   = visual_tokens.size(0)
-        dev = visual_tokens.device
-
-        # summon_full_params materialises the root FSDP unit's params (which
-        # includes the embedding) on all ranks for the duration of the block.
-        ctx = (FSDP_class.summon_full_params(self, writeback=False, recurse=False)
-               if isinstance(self, FSDP_class) else torch.no_grad())
-        with ctx:
-            emb       = self.llm.get_input_embeddings()
-            start_emb = emb(torch.full((B, 1), visual_start_id, dtype=torch.long, device=dev))
-            end_emb   = emb(torch.full((B, 1), visual_end_id,   dtype=torch.long, device=dev))
-            input_embeds = torch.cat(
-                [start_emb, visual_tokens, end_emb, emb(instruct_ids), emb(prefix_ids)],
-                dim=1,
-            )
-
-        return self.llm.generate(inputs_embeds=input_embeds, **gen_kwargs)
+    def generate(self, inputs_embeds, **gen_kwargs):
+        """Caller is responsible for building inputs_embeds (see _build_gen_embeds)."""
+        return self.llm.generate(inputs_embeds=inputs_embeds, **gen_kwargs)
 
     def gradient_checkpointing_enable(self, **kw):
         self.llm.gradient_checkpointing_enable(**kw)
@@ -496,6 +479,26 @@ class MultimodalLLM(nn.Module):
     @property
     def config(self):
         return self.llm.config
+
+
+def _build_gen_embeds(fsdp_llm, vis_emb, instruct_ids, prefix_ids,
+                      visual_start_id, visual_end_id, device):
+    """
+    Build inputs_embeds for generation.  Must be called with the FSDP-wrapped
+    llm handle so summon_full_params can gather the (otherwise sharded)
+    embedding weight on all ranks before the lookup.
+    """
+    inner = getattr(fsdp_llm, '_fsdp_wrapped_module', fsdp_llm)
+    B     = vis_emb.size(0)
+    ctx   = (FSDP_class.summon_full_params(fsdp_llm, writeback=False, recurse=False)
+             if isinstance(fsdp_llm, FSDP_class) else nullcontext())
+    with ctx:
+        emb       = inner.llm.get_input_embeddings()
+        start_emb = emb(torch.tensor([[visual_start_id]], dtype=torch.long, device=device))
+        end_emb   = emb(torch.tensor([[visual_end_id]],   dtype=torch.long, device=device))
+        return torch.cat(
+            [start_emb, vis_emb, end_emb, emb(instruct_ids), emb(prefix_ids)], dim=1
+        )
 
 
 def train_stage1(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
@@ -825,11 +828,12 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
                     raw_tok = visual_encoder(volume, return_encoded_tokens=True)
                     vis_emb = projector(raw_tok.to(torch.bfloat16))
 
-                    # MultimodalLLM.generate() handles summon_full_params
-                    # internally so the embedding lookup is FSDP-safe.
+                    input_embeds = _build_gen_embeds(
+                        llm, vis_emb, instruct_ids_tmpl, prefix_ids,
+                        visual_start_id, visual_end_id, accelerator.device,
+                    )
                     out_ids = llm.generate(
-                        vis_emb, instruct_ids_tmpl, prefix_ids,
-                        visual_start_id, visual_end_id,
+                        input_embeds,
                         max_new_tokens=cfg.eval.max_tokens,
                         do_sample=False,
                         temperature=1.0,
@@ -1037,11 +1041,25 @@ def main(cfg: DictConfig):
         print(f"  Stage 1 dataset: {len(report_dataset)} pairs")
         print(f"  Stage 2 dataset: {len(instruct_dataset)} pairs")
 
-    # Stage 1: projector-only alignment (LoRA frozen).
-    train_stage1(
-        cfg, accelerator, visual_encoder, projector, llm, tokenizer,
-        report_dataset, visual_start_id, visual_end_id,
-    )
+    # Stage 1: projector-only alignment (LoRA frozen). Skip if epochs=0.
+    if cfg.stage1.epochs > 0:
+        train_stage1(
+            cfg, accelerator, visual_encoder, projector, llm, tokenizer,
+            report_dataset, visual_start_id, visual_end_id,
+        )
+    else:
+        # Try to resume from the best stage 1 checkpoint so stage 2 starts
+        # from trained projector weights rather than random initialisation.
+        for candidate in ["best", "final"]:
+            ckpt = os.path.join(cfg.paths.ckpt_dir, "stage1", candidate)
+            if os.path.isdir(ckpt):
+                if accelerator.is_main_process:
+                    print(f"Stage 1 skipped — loading checkpoint: {ckpt}")
+                accelerator.load_state(ckpt)  # collective: all ranks
+                break
+        else:
+            if accelerator.is_main_process:
+                print("Stage 1 skipped — no checkpoint found, projector starts random.")
 
     # Stage 2: unfreezes LoRA; trains projector + LoRA.
     train_stage2(
