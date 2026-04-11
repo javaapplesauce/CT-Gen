@@ -467,8 +467,20 @@ class MultimodalLLM(nn.Module):
                         token_type_ids=token_type_ids, labels=full_labels)
 
     def generate(self, inputs_embeds, **gen_kwargs):
-        """Caller is responsible for building inputs_embeds (see _build_gen_embeds)."""
-        return self.llm.generate(inputs_embeds=inputs_embeds, **gen_kwargs)
+        """
+        Run generation with all FSDP params gathered.
+
+        Calling self.llm.generate() bypasses the root FSDP forward hook, so
+        root-unit params (final norm, lm_head) are never all-gathered by the
+        normal FSDP machinery.  summon_full_params(recurse=True) materialises
+        every FSDP unit's params for the duration of the generate loop.
+        _fsdp_handle is set by main() after accelerator.prepare().
+        """
+        fsdp_handle = getattr(self, '_fsdp_handle', None)
+        ctx = (FSDP_class.summon_full_params(fsdp_handle, writeback=False, recurse=True)
+               if fsdp_handle is not None else nullcontext())
+        with ctx:
+            return self.llm.generate(inputs_embeds=inputs_embeds, **gen_kwargs)
 
     def gradient_checkpointing_enable(self, **kw):
         self.llm.gradient_checkpointing_enable(**kw)
@@ -1014,6 +1026,11 @@ def main(cfg: DictConfig):
     # SINGLE FSDP wrap for projector + llm. Never re-prepare these models.
     # Per-stage optimizers/schedulers/loaders are prepared inside the stages.
     projector, llm = accelerator.prepare(projector, llm)
+
+    # Give the inner MultimodalLLM a reference to the FSDP wrapper so its
+    # generate() method can call summon_full_params on all ranks.
+    if isinstance(llm, FSDP_class):
+        llm._fsdp_wrapped_module._fsdp_handle = llm
 
     if accelerator.is_main_process:
         print("\nSplitting volumes...")
