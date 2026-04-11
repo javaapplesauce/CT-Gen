@@ -496,9 +496,12 @@ def _build_gen_embeds(fsdp_llm, vis_emb, instruct_ids, prefix_ids,
         emb       = inner.llm.get_input_embeddings()
         start_emb = emb(torch.tensor([[visual_start_id]], dtype=torch.long, device=device))
         end_emb   = emb(torch.tensor([[visual_end_id]],   dtype=torch.long, device=device))
-        return torch.cat(
+        embeds    = torch.cat(
             [start_emb, vis_emb, end_emb, emb(instruct_ids), emb(prefix_ids)], dim=1
         )
+    # summon_full_params materialises weights in fp32; cast back to bf16 so
+    # inputs_embeds matches the decoder layer weights during generation.
+    return embeds.to(torch.bfloat16)
 
 
 def train_stage1(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
