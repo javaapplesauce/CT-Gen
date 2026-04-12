@@ -835,7 +835,20 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
 
             # All FSDP ranks must participate in every forward/generate call.
             accelerator.wait_for_everyone()
-            with torch.no_grad():
+
+            # Use a single top-level summon_full_params for the entire
+            # generation block.  This avoids the fragile _fsdp_handle
+            # mechanism inside MultimodalLLM.generate() and ensures ALL
+            # FSDP-sharded params (including root-level norm / lm_head)
+            # are fully gathered for the duration of autoregressive
+            # decoding, which bypasses FSDP forward hooks.
+            _gen_ctx = (FSDP_class.summon_full_params(llm, writeback=False, recurse=True)
+                        if isinstance(llm, FSDP_class) else nullcontext())
+
+            with _gen_ctx, torch.no_grad():
+                unwrapped_llm = accelerator.unwrap_model(llm)
+                emb_fn = unwrapped_llm.llm.get_input_embeddings()
+
                 for mbatch in metric_loader:
                     volume   = mbatch["volume"].to(accelerator.device, dtype=torch.float32)
                     ref_text = mbatch["report"][0]
@@ -843,12 +856,18 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
                     raw_tok = visual_encoder(volume, return_encoded_tokens=True)
                     vis_emb = projector(raw_tok.to(torch.bfloat16))
 
-                    input_embeds = _build_gen_embeds(
-                        llm, vis_emb, instruct_ids_tmpl, prefix_ids,
-                        visual_start_id, visual_end_id, accelerator.device,
-                    )
-                    out_ids = llm.generate(
-                        input_embeds,
+                    # Build generation embeddings directly — no nested
+                    # summon_full_params needed since the outer context
+                    # already gathered all params.
+                    dev = accelerator.device
+                    start_emb = emb_fn(torch.tensor([[visual_start_id]], dtype=torch.long, device=dev))
+                    end_emb   = emb_fn(torch.tensor([[visual_end_id]],   dtype=torch.long, device=dev))
+                    input_embeds = torch.cat(
+                        [start_emb, vis_emb, end_emb, emb_fn(instruct_ids_tmpl), emb_fn(prefix_ids)], dim=1
+                    ).to(torch.bfloat16)
+
+                    out_ids = unwrapped_llm.llm.generate(
+                        inputs_embeds=input_embeds,
                         max_new_tokens=cfg.eval.max_tokens,
                         do_sample=False,
                         temperature=1.0,
@@ -1029,8 +1048,10 @@ def main(cfg: DictConfig):
 
     # Give the inner MultimodalLLM a reference to the FSDP wrapper so its
     # generate() method can call summon_full_params on all ranks.
-    if isinstance(llm, FSDP_class):
-        llm._fsdp_wrapped_module._fsdp_handle = llm
+    # Use accelerator.unwrap_model for robustness across Accelerate versions
+    # (the wrapper type may not always be FSDP_class directly).
+    _inner_llm = accelerator.unwrap_model(llm)
+    _inner_llm._fsdp_handle = llm if isinstance(llm, FSDP_class) else None
 
     if accelerator.is_main_process:
         print("\nSplitting volumes...")

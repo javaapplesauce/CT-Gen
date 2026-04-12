@@ -1,0 +1,85 @@
+Stage 2 | train=608  val=152  steps=570  warmup=57
+[S2 E1/15] step=5 loss=3.3984  lr=3.51e-04
+[S2 E1/15] step=10 loss=2.3921  lr=4.98e-04
+[S2 E1/15] step=15 loss=1.9671  lr=4.82e-04
+[S2 E1/15] step=20 loss=2.0263  lr=4.52e-04
+[S2 E1/15] step=25 loss=1.5525  lr=4.10e-04
+[S2 E1/15] step=30 loss=1.6151  lr=3.59e-04
+[S2 E1/15] step=35 loss=1.1901  lr=3.01e-04
+[S2 E1] val_loss=1.5502
+Error executing job with overrides: ['model.llm_id=google/gemma-3-4b-it', 'model.llm_hidden_dim=2560', 'data.volume_limit=3000', 'data.val_split=0.2', 'stage1.epochs=0', 'stage1.lr=5e-4', 'stage1.accum_steps=2', 'stage1.log_every=5', 'stage2.epochs=15', 'stage2.lr=5e-4', 'stage2.accum_steps=2', 'stage2.log_every=5', 'eval.val_metric_samples=50']
+Traceback (most recent call last):
+  File "/lambda/nfs/richardli-CT-Gen/CT-Gen/ct-gen-fsdp/train.py", line 1068, in main
+    train_stage2(
+  File "/lambda/nfs/richardli-CT-Gen/CT-Gen/ct-gen-fsdp/train.py", line 838, in train_stage2
+    out_ids = llm.generate(
+              ^^^^^^^^^^^^^
+  File "/lambda/nfs/richardli-CT-Gen/CT-Gen/ct-gen-fsdp/train.py", line 471, in generate
+    return self.llm.generate(inputs_embeds=inputs_embeds, **gen_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/peft/peft_model.py", line 2048, in generate
+    outputs = self.base_model.generate(*args, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/generation/utils.py", line 2543, in generate
+    result = decoding_method(
+             ^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/generation/utils.py", line 2736, in _sample
+    outputs = self._prefill(
+              ^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/generation/utils.py", line 3768, in _prefill
+    return self(**model_inputs, return_dict=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/utils/generic.py", line 876, in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/models/gemma3/modeling_gemma3.py", line 1034, in forward
+    outputs = self.model(
+              ^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/utils/generic.py", line 876, in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/models/gemma3/modeling_gemma3.py", line 927, in forward
+    outputs = self.language_model(
+              ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/utils/generic.py", line 952, in wrapper
+    output = func(self, *args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/utils/output_capturing.py", line 248, in wrapper
+    outputs = func(self, *args, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/models/gemma3/modeling_gemma3.py", line 583, in forward
+    hidden_states = self.norm(hidden_states)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/nn/modules/module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/torch/nn/modules/module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/.local/lib/python3.12/site-packages/transformers/models/gemma3/modeling_gemma3.py", line 145, in forward
+    output = output * (1.0 + self.weight.float())
+             ~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+RuntimeError: The size of tensor a (2560) must match the size of tensor b (0) at non-singleton dimension 2
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
