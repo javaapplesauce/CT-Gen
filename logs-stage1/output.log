@@ -1,0 +1,233 @@
+Stage 1 | train=608  val=152  steps=304  warmup=30
+Trainable params: 0.79M
+[S1 E1/8] step=5 loss=4.9352  lr=4.98e-04
+[S1 E1/8] step=10 loss=3.7654  lr=4.60e-04
+[S1 E1/8] step=15 loss=3.4652  lr=3.78e-04
+[S1 E1/8] step=20 loss=3.3089  lr=2.70e-04
+[S1 E1/8] step=25 loss=3.4375  lr=1.58e-04
+[S1 E1/8] step=30 loss=3.3316  lr=6.43e-05
+[S1 E1/8] step=35 loss=3.2670  lr=9.41e-06
+[S1 E1] val_loss=3.2621
+[2026-04-10 23:40:57,213][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:40:57,214][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+/usr/lib/python3/dist-packages/torch/distributed/fsdp/fully_sharded_data_parallel.py:680: FutureWarning: FSDP.state_dict_type() and FSDP.set_state_dict_type() are being deprecated. Please use APIs, get_state_dict() and set_state_dict(), which can support different parallelisms, FSDP1, FSDP2, DDP. API doc: https://pytorch.org/docs/stable/distributed.checkpoint.html#torch.distributed.checkpoint.state_dict.get_state_dict .Tutorial: https://pytorch.org/tutorials/recipes/distributed_checkpoint_recipe.html .
+  warnings.warn(
+[2026-04-10 23:40:57,370][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:40:57,419][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:40:57,423][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:40:57,424][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:41:28,393][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:42:05,262][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:42:05,285][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:42:05,286][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:42:05,349][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:42:05,441][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:42:05,442][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:42:05,444][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/best/scheduler.bin
+[2026-04-10 23:42:05,444][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler.bin
+[2026-04-10 23:42:05,445][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler_1.bin
+[2026-04-10 23:42:05,448][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/best/random_states_0.pkl
+  -> Best checkpoint (val_loss=3.2621)
+[S1 E2/8] step=40 loss=3.2908  lr=4.19e-06
+[S1 E2/8] step=45 loss=3.2621  lr=4.98e-05
+[S1 E2/8] step=50 loss=3.1391  lr=1.37e-04
+[S1 E2/8] step=55 loss=3.1434  lr=2.47e-04
+[S1 E2/8] step=60 loss=3.1693  lr=3.58e-04
+[S1 E2/8] step=65 loss=2.9298  lr=4.47e-04
+[S1 E2/8] step=70 loss=2.8004  lr=4.95e-04
+[S1 E2/8] step=75 loss=2.7692  lr=4.92e-04
+[S1 E2] val_loss=2.8398
+[2026-04-10 23:42:59,461][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:42:59,461][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:42:59,491][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:42:59,538][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:42:59,540][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:42:59,540][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:43:16,607][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:43:53,063][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:43:53,090][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:43:53,091][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:43:53,156][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:43:53,267][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:43:53,268][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:43:53,269][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/best/scheduler.bin
+[2026-04-10 23:43:53,270][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler.bin
+[2026-04-10 23:43:53,271][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler_1.bin
+[2026-04-10 23:43:53,274][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/best/random_states_0.pkl
+  -> Best checkpoint (val_loss=2.8398)
+[S1 E3/8] step=80 loss=2.7379  lr=4.39e-04
+[S1 E3/8] step=85 loss=2.8079  lr=3.48e-04
+[S1 E3/8] step=90 loss=2.6635  lr=2.36e-04
+[S1 E3/8] step=95 loss=2.7043  lr=1.27e-04
+[S1 E3/8] step=100 loss=2.5249  lr=4.31e-05
+[S1 E3/8] step=105 loss=2.6026  lr=2.36e-06
+[S1 E3/8] step=110 loss=2.5953  lr=1.28e-05
+[S1 E3] val_loss=2.7097
+[2026-04-10 23:44:47,114][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:44:47,115][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:44:47,156][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:44:47,204][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:44:47,205][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:44:47,205][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:45:09,820][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:45:47,062][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:45:47,088][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:45:47,089][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:45:47,146][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:45:47,241][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:45:47,242][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:45:47,243][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/best/scheduler.bin
+[2026-04-10 23:45:47,244][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler.bin
+[2026-04-10 23:45:47,244][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler_1.bin
+[2026-04-10 23:45:47,246][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/best/random_states_0.pkl
+  -> Best checkpoint (val_loss=2.7097)
+[S1 E4/8] step=115 loss=2.6775  lr=7.22e-05
+[S1 E4/8] step=120 loss=2.6390  lr=1.68e-04
+[S1 E4/8] step=125 loss=2.6658  lr=2.81e-04
+[S1 E4/8] step=130 loss=2.6750  lr=3.88e-04
+[S1 E4/8] step=135 loss=2.5389  lr=4.66e-04
+[S1 E4/8] step=140 loss=2.6430  lr=4.99e-04
+[S1 E4/8] step=145 loss=2.5610  lr=4.81e-04
+[S1 E4/8] step=150 loss=2.5803  lr=4.15e-04
+[S1 E4] val_loss=2.5939
+[2026-04-10 23:46:39,631][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:46:39,631][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:46:39,655][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:46:39,703][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:46:39,704][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:46:39,705][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:47:04,148][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:47:43,228][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:47:43,255][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:47:43,256][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:47:43,318][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:47:43,430][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:47:43,431][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:47:43,433][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/best/scheduler.bin
+[2026-04-10 23:47:43,433][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler.bin
+[2026-04-10 23:47:43,434][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler_1.bin
+[2026-04-10 23:47:43,437][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/best/random_states_0.pkl
+  -> Best checkpoint (val_loss=2.5939)
+[S1 E5/8] step=155 loss=2.4408  lr=3.15e-04
+[S1 E5/8] step=160 loss=2.4313  lr=2.02e-04
+[S1 E5/8] step=165 loss=2.5262  lr=9.80e-05
+[S1 E5/8] step=170 loss=2.3700  lr=2.58e-05
+[S1 E5/8] step=175 loss=2.3795  lr=0.00e+00
+[S1 E5/8] step=180 loss=2.4241  lr=2.58e-05
+[S1 E5/8] step=185 loss=2.3903  lr=9.80e-05
+[S1 E5/8] step=190 loss=2.5271  lr=2.02e-04
+[S1 E5] val_loss=2.5367
+[2026-04-10 23:48:39,281][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:48:39,282][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:48:39,307][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:48:39,355][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:48:39,358][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:48:39,358][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:48:59,838][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:49:36,710][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:49:36,736][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:49:36,736][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:49:36,785][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:49:36,877][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:49:36,878][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:49:36,879][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/best/scheduler.bin
+[2026-04-10 23:49:36,880][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler.bin
+[2026-04-10 23:49:36,880][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler_1.bin
+[2026-04-10 23:49:36,882][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/best/random_states_0.pkl
+  -> Best checkpoint (val_loss=2.5367)
+[S1 E6/8] step=195 loss=2.3940  lr=3.15e-04
+[S1 E6/8] step=200 loss=2.3166  lr=4.15e-04
+[S1 E6/8] step=205 loss=2.4037  lr=4.81e-04
+[S1 E6/8] step=210 loss=2.5478  lr=4.99e-04
+[S1 E6/8] step=215 loss=2.4576  lr=4.66e-04
+[S1 E6/8] step=220 loss=2.2452  lr=3.88e-04
+[S1 E6/8] step=225 loss=2.2497  lr=2.81e-04
+[S1 E6] val_loss=2.4196
+[2026-04-10 23:50:31,211][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:50:31,212][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:50:31,237][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:50:31,283][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:50:31,284][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:50:31,285][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:50:48,654][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:51:25,555][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:51:25,581][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:51:25,582][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:51:25,628][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:51:25,719][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:51:25,721][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:51:25,722][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/best/scheduler.bin
+[2026-04-10 23:51:25,722][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler.bin
+[2026-04-10 23:51:25,723][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler_1.bin
+[2026-04-10 23:51:25,725][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/best/random_states_0.pkl
+  -> Best checkpoint (val_loss=2.4196)
+[S1 E7/8] step=230 loss=2.1402  lr=1.68e-04
+[S1 E7/8] step=235 loss=2.3075  lr=7.22e-05
+[S1 E7/8] step=240 loss=2.1888  lr=1.28e-05
+[S1 E7/8] step=245 loss=2.4001  lr=2.36e-06
+[S1 E7/8] step=250 loss=2.2746  lr=4.31e-05
+[S1 E7/8] step=255 loss=2.3970  lr=1.27e-04
+[S1 E7/8] step=260 loss=2.2776  lr=2.36e-04
+[S1 E7/8] step=265 loss=2.2839  lr=3.48e-04
+[S1 E7] val_loss=2.3751
+[2026-04-10 23:52:22,252][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:52:22,252][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:52:22,271][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:52:22,320][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:52:22,322][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:52:22,323][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:52:41,272][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:53:19,096][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:53:19,126][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:53:19,126][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:53:19,179][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:53:19,276][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:53:19,277][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:53:19,279][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/best/scheduler.bin
+[2026-04-10 23:53:19,280][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler.bin
+[2026-04-10 23:53:19,280][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler_1.bin
+[2026-04-10 23:53:19,282][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/best/random_states_0.pkl
+  -> Best checkpoint (val_loss=2.3751)
+[S1 E8/8] step=270 loss=2.2261  lr=4.39e-04
+[S1 E8/8] step=275 loss=2.1859  lr=4.92e-04
+[S1 E8/8] step=280 loss=2.2663  lr=4.95e-04
+[S1 E8/8] step=285 loss=2.3162  lr=4.47e-04
+[S1 E8/8] step=290 loss=2.2259  lr=3.58e-04
+[S1 E8/8] step=295 loss=2.0994  lr=2.47e-04
+[S1 E8/8] step=300 loss=2.2673  lr=1.37e-04
+[S1 E8] val_loss=2.3129
+[2026-04-10 23:54:08,283][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:54:08,283][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:54:08,301][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:54:08,350][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp.bin
+[2026-04-10 23:54:08,351][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:54:08,351][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:54:24,356][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:54:57,915][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/best/pytorch_model_fsdp_1.bin
+[2026-04-10 23:54:57,934][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:54:57,935][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:54:57,972][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:54:58,064][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/best/optimizer.bin
+[2026-04-10 23:54:58,065][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/best
+[2026-04-10 23:54:58,065][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/best/scheduler.bin
+[2026-04-10 23:54:58,066][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler.bin
+[2026-04-10 23:54:58,067][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/best/sampler_1.bin
+[2026-04-10 23:54:58,069][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/best/random_states_0.pkl
+  -> Best checkpoint (val_loss=2.3129)
+[2026-04-10 23:54:58,071][accelerate.accelerator][INFO] - [RANK 0] Saving current state to /home/ubuntu/ctgen/ckpts/stage1/final
+[2026-04-10 23:54:58,071][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:54:58,118][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/final/pytorch_model_fsdp.bin
+[2026-04-10 23:54:58,173][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/final/pytorch_model_fsdp.bin
+[2026-04-10 23:54:58,174][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/final
+[2026-04-10 23:54:58,175][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP model
+[2026-04-10 23:55:26,469][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving model to /home/ubuntu/ctgen/ckpts/stage1/final/pytorch_model_fsdp_1.bin
+[2026-04-10 23:56:03,031][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Model saved to /home/ubuntu/ctgen/ckpts/stage1/final/pytorch_model_fsdp_1.bin
+[2026-04-10 23:56:03,057][accelerate.accelerator][INFO] - [RANK 0] FSDP Model saved to output dir /home/ubuntu/ctgen/ckpts/stage1/final
+[2026-04-10 23:56:03,058][accelerate.accelerator][INFO] - [RANK 0] Saving FSDP Optimizer
+[2026-04-10 23:56:03,117][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Saving Optimizer state to /home/ubuntu/ctgen/ckpts/stage1/final/optimizer.bin
+[2026-04-10 23:56:03,208][accelerate.utils.fsdp_utils][INFO] - [RANK 0] Optimizer state saved in /home/ubuntu/ctgen/ckpts/stage1/final/optimizer.bin
+[2026-04-10 23:56:03,210][accelerate.accelerator][INFO] - [RANK 0] FSDP Optimizer saved to output dir /home/ubuntu/ctgen/ckpts/stage1/final
+[2026-04-10 23:56:03,211][accelerate.checkpointing][INFO] - [RANK 0] Scheduler state saved in /home/ubuntu/ctgen/ckpts/stage1/final/scheduler.bin
+[2026-04-10 23:56:03,211][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 0 saved in /home/ubuntu/ctgen/ckpts/stage1/final/sampler.bin
+[2026-04-10 23:56:03,212][accelerate.checkpointing][INFO] - [RANK 0] Sampler state for dataloader 1 saved in /home/ubuntu/ctgen/ckpts/stage1/final/sampler_1.bin
+[2026-04-10 23:56:03,216][accelerate.checkpointing][INFO] - [RANK 0] Random states saved in /home/ubuntu/ctgen/ckpts/stage1/final/random_states_0.pkl
