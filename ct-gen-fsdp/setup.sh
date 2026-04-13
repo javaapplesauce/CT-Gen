@@ -18,6 +18,16 @@ mkdir -p "$BASE_DIR"
 sudo apt-get update -qq && sudo apt-get install -y -qq aria2 > /dev/null 2>&1 || true
 
 # ── Python deps ───────────────────────────────────────────────
+# Remove any stray 'attr' package that shadows 'attrs' and breaks Hydra/OmegaConf
+# (Hydra calls attr.has(...), which only exists in the 'attrs' distribution).
+pip uninstall -y attr 2>/dev/null || true
+pip install -q --upgrade attrs
+
+# Pin numpy to the 1.x line for scipy 1.11.4 / CT-CLIP compatibility, and
+# downgrade opencv-python to the last 4.x build that supports numpy 1.x
+# (opencv-python >= 4.11 requires numpy >= 2).
+pip install -q "numpy==1.26.4" "scipy==1.11.4" "opencv-python==4.10.0.84"
+
 pip install -q \
     hydra-core \
     omegaconf \
@@ -36,6 +46,11 @@ pip install -q \
     nltk \
     rouge-score \
     bert-score
+
+# Sanity check: Hydra import must succeed (catches attr/attrs shadowing early)
+python -c "import hydra, omegaconf, attr; assert hasattr(attr, 'has'), 'attr.has missing — attrs package not active'" \
+    && echo "Hydra/attrs import OK" \
+    || { echo "ERROR: Hydra import failed — check attr/attrs install"; exit 1; }
 
 # ── CT-CLIP (for CTViT architecture) ─────────────────────────
 CT_CLIP_DIR="$BASE_DIR/CT-CLIP"
