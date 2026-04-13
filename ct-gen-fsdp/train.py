@@ -1055,10 +1055,12 @@ def main(cfg: DictConfig):
 
     # Give the inner MultimodalLLM a reference to the FSDP wrapper so its
     # generate() method can call summon_full_params on all ranks.
-    # Use accelerator.unwrap_model for robustness across Accelerate versions
-    # (the wrapper type may not always be FSDP_class directly).
+    # Assign via __dict__ to bypass nn.Module.__setattr__ — otherwise the
+    # FSDP wrapper gets registered as a child module of the very module it
+    # wraps, creating a cycle in self.modules() that blows the stack on
+    # llm.eval() / llm.train().
     _inner_llm = accelerator.unwrap_model(llm)
-    _inner_llm._fsdp_handle = llm if isinstance(llm, FSDP_class) else None
+    _inner_llm.__dict__["_fsdp_handle"] = llm if isinstance(llm, FSDP_class) else None
 
     if accelerator.is_main_process:
         print("\nSplitting volumes...")
