@@ -31,7 +31,10 @@ from transformers import (
 )
 from peft import get_peft_model, LoraConfig, TaskType
 from accelerate import Accelerator, FullyShardedDataParallelPlugin
-from torch.distributed.fsdp import ShardingStrategy, BackwardPrefetch, FullyShardedDataParallel as FSDP_class
+from torch.distributed.fsdp import (
+    ShardingStrategy, BackwardPrefetch, FullyShardedDataParallel as FSDP_class,
+    StateDictType, FullStateDictConfig,
+)
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 
 
@@ -327,6 +330,38 @@ class CTInstructDataset(Dataset):
         labels[: self.prompt_len] = -100
 
         return {"volume": volume, "input_ids": input_ids, "labels": labels, "report": report}
+
+
+def save_stage2_checkpoint(accelerator, projector, llm, out_dir):
+    """Save projector weights + LoRA adapter without optimizer state.
+
+    accelerator.save_state fails in stage 2 because one optimizer spans two
+    FSDP-wrapped modules (projector + llm with LoRA), and FSDP.optim_state_dict
+    can't map cross-model params to a single model's FQNs (KeyError on param
+    lookup). We don't need optimizer state for downstream inference, so save
+    weights only.
+    """
+    accelerator.wait_for_everyone()
+    os.makedirs(out_dir, exist_ok=True)
+
+    # Projector: FSDP FULL_STATE_DICT gather on rank 0.
+    cfg = FullStateDictConfig(offload_to_cpu=True, rank0_only=True)
+    if isinstance(projector, FSDP_class):
+        with FSDP_class.state_dict_type(projector, StateDictType.FULL_STATE_DICT, cfg):
+            proj_state = projector.state_dict()
+    else:
+        proj_state = projector.state_dict()
+    if accelerator.is_main_process:
+        torch.save(proj_state, os.path.join(out_dir, "projector.pt"))
+
+    # LoRA adapter: gather full params via FSDP context, then PEFT save.
+    unwrapped = accelerator.unwrap_model(llm)
+    gather_ctx = (FSDP_class.state_dict_type(llm, StateDictType.FULL_STATE_DICT, cfg)
+                  if isinstance(llm, FSDP_class) else nullcontext())
+    with gather_ctx:
+        if accelerator.is_main_process:
+            unwrapped.llm.save_pretrained(os.path.join(out_dir, "lora"))
+    accelerator.wait_for_everyone()
 
 
 def split_volumes(raw_dir, pt_dir, test_split=0.05, seed=42):
@@ -919,12 +954,14 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
                         "s2/step": global_step})
         if val_loss < best_val:
             best_val = val_loss
-            accelerator.save_state(os.path.join(ckpt_dir, "best"))  # collective: all ranks
+            save_stage2_checkpoint(accelerator, projector, llm,
+                                   os.path.join(ckpt_dir, "best"))
             if accelerator.is_main_process:
                 print(f"  -> Best S2 checkpoint (val_loss={best_val:.4f})")
 
     accelerator.wait_for_everyone()
-    accelerator.save_state(os.path.join(ckpt_dir, "final"))  # collective: all ranks
+    save_stage2_checkpoint(accelerator, projector, llm,
+                           os.path.join(ckpt_dir, "final"))
     if accelerator.is_main_process:
         wandb.log({"s2/best_val_loss": best_val})
         wandb.finish()
