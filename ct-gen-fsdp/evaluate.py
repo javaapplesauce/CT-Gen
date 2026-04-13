@@ -168,45 +168,51 @@ def main():
     print("Loading CTGenAggregator...")
     projector = build_aggregator(cfg).to(device)
 
-    # Load checkpoint
-    # accelerate save_state writes:
-    #   model.safetensors   → projector (prepared first)
-    #   model_1.safetensors → LLM + LoRA (prepared second)
+    # Load checkpoint. New format (save_stage2_checkpoint):
+    #   {ckpt}/projector.pt       → projector weights
+    #   {ckpt}/lora/              → PEFT adapter dir
+    # Legacy accelerator.save_state format also supported as a fallback.
     ckpt_path = os.path.join(cfg.paths.ckpt_dir, checkpoint)
     if os.path.exists(ckpt_path):
         from safetensors.torch import load_file as _sf_load
 
         # ── Projector ──────────────────────────────────────────────
-        proj_file = os.path.join(ckpt_path, "pytorch_model.bin")
-        if not os.path.exists(proj_file):
-            proj_file = os.path.join(ckpt_path, "model.safetensors")
-        if os.path.exists(proj_file):
+        proj_candidates = [
+            os.path.join(ckpt_path, "projector.pt"),          # new
+            os.path.join(ckpt_path, "pytorch_model.bin"),     # legacy
+            os.path.join(ckpt_path, "model.safetensors"),     # legacy
+        ]
+        proj_file = next((p for p in proj_candidates if os.path.exists(p)), None)
+        if proj_file:
             _sd = (_sf_load(proj_file, device=str(device))
                    if proj_file.endswith(".safetensors")
                    else torch.load(proj_file, map_location=device, weights_only=True))
             projector.load_state_dict(_sd, strict=False)
-            print(f"Loaded projector from {ckpt_path}")
+            print(f"Loaded projector from {proj_file}")
 
-        # ── LLM + LoRA ─────────────────────────────────────────────
-        llm_sf = os.path.join(ckpt_path, "model_1.safetensors")
-        if os.path.exists(llm_sf):
-            # Attach LoRA with same config as training, then load state dict.
+        # ── LoRA adapter ───────────────────────────────────────────
+        lora_dir_new    = os.path.join(ckpt_path, "lora")            # new
+        lora_dir_legacy = os.path.join(ckpt_path, "lora_adapters")   # legacy
+        llm_sf          = os.path.join(ckpt_path, "model_1.safetensors")
+        if os.path.isdir(lora_dir_new):
+            llm = PeftModel.from_pretrained(llm, lora_dir_new)
+            print(f"Loaded LoRA from {lora_dir_new}")
+        elif os.path.isdir(lora_dir_legacy):
+            llm = PeftModel.from_pretrained(llm, lora_dir_legacy)
+            print(f"Loaded LoRA from {lora_dir_legacy}")
+        elif os.path.exists(llm_sf):
             lora_cfg = LoraConfig(
                 task_type=TaskType.CAUSAL_LM,
                 r=cfg.model.lora_r,
                 lora_alpha=cfg.model.lora_alpha,
                 target_modules=list(cfg.model.lora_target_modules),
-                lora_dropout=0.0,   # no dropout at inference
+                lora_dropout=0.0,
                 bias="none",
             )
             llm = get_peft_model(llm, lora_cfg)
             _sd = _sf_load(llm_sf, device=str(device))
             llm.load_state_dict(_sd, strict=False)
             print(f"Loaded LLM+LoRA from {llm_sf}")
-        elif os.path.exists(os.path.join(ckpt_path, "lora_adapters")):
-            lora_dir = os.path.join(ckpt_path, "lora_adapters")
-            llm = PeftModel.from_pretrained(llm, lora_dir)
-            print(f"Loaded LoRA from {lora_dir}")
     else:
         print(f"WARNING: Checkpoint not found at {ckpt_path}, using untrained model")
 

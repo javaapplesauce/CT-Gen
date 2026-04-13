@@ -73,24 +73,35 @@ def main():
     print("Loading CTGenAggregator...")
     projector = build_aggregator(cfg).to(device)
 
+    # New format (save_stage2_checkpoint): projector.pt + lora/ dir.
+    # Legacy accelerator.save_state layout also supported as fallback.
     proj_ckpt = os.path.join(cfg.paths.ckpt_dir, "stage2", "best")
     if os.path.exists(proj_ckpt):
         from safetensors.torch import load_file as _sf_load
 
-        # ── Projector ──────────────────────────────────────────────
-        proj_file = os.path.join(proj_ckpt, "pytorch_model.bin")
-        if not os.path.exists(proj_file):
-            proj_file = os.path.join(proj_ckpt, "model.safetensors")
-        if os.path.exists(proj_file):
+        proj_candidates = [
+            os.path.join(proj_ckpt, "projector.pt"),
+            os.path.join(proj_ckpt, "pytorch_model.bin"),
+            os.path.join(proj_ckpt, "model.safetensors"),
+        ]
+        proj_file = next((p for p in proj_candidates if os.path.exists(p)), None)
+        if proj_file:
             _sd = (_sf_load(proj_file, device=str(device))
                    if proj_file.endswith(".safetensors")
                    else torch.load(proj_file, map_location=device, weights_only=True))
             projector.load_state_dict(_sd, strict=False)
-            print(f"Loaded projector from {proj_ckpt}")
+            print(f"Loaded projector from {proj_file}")
 
-        # ── LLM + LoRA ─────────────────────────────────────────────
-        llm_sf = os.path.join(proj_ckpt, "model_1.safetensors")
-        if os.path.exists(llm_sf):
+        lora_dir_new    = os.path.join(proj_ckpt, "lora")
+        lora_dir_legacy = os.path.join(proj_ckpt, "lora_adapters")
+        llm_sf          = os.path.join(proj_ckpt, "model_1.safetensors")
+        if os.path.isdir(lora_dir_new):
+            llm = PeftModel.from_pretrained(llm, lora_dir_new)
+            print(f"Loaded LoRA from {lora_dir_new}")
+        elif os.path.isdir(lora_dir_legacy):
+            llm = PeftModel.from_pretrained(llm, lora_dir_legacy)
+            print(f"Loaded LoRA from {lora_dir_legacy}")
+        elif os.path.exists(llm_sf):
             lora_cfg = LoraConfig(
                 task_type=TaskType.CAUSAL_LM,
                 r=cfg.model.lora_r,
@@ -103,10 +114,6 @@ def main():
             _sd = _sf_load(llm_sf, device=str(device))
             llm.load_state_dict(_sd, strict=False)
             print(f"Loaded LLM+LoRA from {llm_sf}")
-        elif os.path.exists(os.path.join(proj_ckpt, "lora_adapters")):
-            lora_dir = os.path.join(proj_ckpt, "lora_adapters")
-            llm = PeftModel.from_pretrained(llm, lora_dir)
-            print(f"Loaded LoRA from {lora_dir}")
 
     projector.to(torch.bfloat16).eval()
     llm.eval()
