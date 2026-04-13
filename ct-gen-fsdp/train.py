@@ -873,14 +873,17 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
                         [start_emb, vis_emb, end_emb, emb_fn(instruct_ids_tmpl), emb_fn(prefix_ids)], dim=1
                     ).to(torch.bfloat16)
 
-                    out_ids = unwrapped_llm.llm.generate(
-                        inputs_embeds=input_embeds,
-                        max_new_tokens=cfg.eval.max_tokens,
-                        do_sample=False,
-                        temperature=1.0,
-                        repetition_penalty=1.2,
-                        pad_token_id=tokenizer.eos_token_id,
-                    )
+                    # summon_full_params gathers fp32 master weights; autocast
+                    # casts them to bf16 to match our bf16 input_embeds in lm_head.
+                    with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                        out_ids = unwrapped_llm.llm.generate(
+                            inputs_embeds=input_embeds,
+                            max_new_tokens=cfg.eval.max_tokens,
+                            do_sample=False,
+                            temperature=1.0,
+                            repetition_penalty=1.2,
+                            pad_token_id=tokenizer.eos_token_id,
+                        )
 
                     if accelerator.is_main_process:
                         gen_texts.append(tokenizer.decode(out_ids[0], skip_special_tokens=True))
