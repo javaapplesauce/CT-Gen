@@ -19,10 +19,11 @@ model:
   target_s: 8
   # Derived: num_visual_tokens = target_t * target_s * target_s = 256
 
-  # LoRA — r=32/alpha=64 for a full training run
+  # LoRA — r=32/alpha=64 for a full training run.
+  # Dropout bumped to 0.1 for the ~5k-sample regime to curb overfitting.
   lora_r: 32
   lora_alpha: 64
-  lora_dropout: 0.05
+  lora_dropout: 0.1
   lora_target_modules:
     - q_proj
     - k_proj
@@ -33,31 +34,38 @@ model:
     - down_proj
 
 # Stage 1: projector-only alignment
+# Projector is randomly initialized — LLaVA-style alignment benefits from a
+# noticeably higher LR than stage 2. 1e-3 is the standard choice.
 stage1:
   epochs: 3
-  lr: 2e-4
-  batch_size: 1
-  accum_steps: 8        # effective batch = batch_size × accum × n_gpus
+  lr: 1e-3
+  batch_size: 1         # NOTE: raising this requires fixing total_steps formula in train.py
+  accum_steps: 8        # effective batch = batch_size × accum × n_gpus = 64 on 8 GPUs
   log_every: 50
 
 # Stage 2: instruction tuning (projector + LoRA)
+# Projector is already aligned, so lower LR. LoRA LR = lr × 0.1 is hardcoded
+# in train.py — keeping projector at 2e-4 keeps LoRA at 2e-5, which is on the
+# low side but safe given the small dataset. Epochs raised to 10 because at
+# ~4.4k train samples / eff-batch 64, 8 epochs is only ~544 optimizer steps.
 stage2:
-  epochs: 8
-  lr: 2e-4              # projector LR; LoRA LR = lr × 0.1 = 2e-5
+  epochs: 10
+  lr: 2e-4              # projector LR
+  # lora_lr: 1e-4       # optional: override LoRA LR. Defaults to lr × 0.1 if unset.
   batch_size: 1
   accum_steps: 8
   log_every: 50
 
 data:
-  test_split: 0.05
-  val_split: 0.08       # ~8% of train+val for validation
-  num_workers: 4        # 4 workers; set to 0 if tokenizer is not picklable
+  test_split: 0.05      # ~250 held-out test samples at volume_limit=5000
+  val_split: 0.08       # ~380 val / ~4370 train
+  num_workers: 8        # bumped from 4 — A100 nodes have ample CPU; set 0 if tokenizer pickling fails
 
   repo_id: ibrahimhamamci/CT-RATE
   reports_hf_path: dataset/radiology_text_reports/validation_reports.csv
   train_reports_hf_path: dataset/radiology_text_reports/train_reports.csv
-  volume_limit: null    # null = all volumes
-  chunk_size: 50
+  volume_limit: 5000    # null = all volumes
+  chunk_size: 100       # larger download chunks, fewer HF round-trips
   preprocess_workers: 0
 
 instruction: >-
@@ -72,7 +80,9 @@ tokens:
 eval:
   checkpoint: stage2/best
   max_tokens: 512
-  val_metric_samples: 50   # reports generated per validation epoch (0 = disable)
+  val_metric_samples: 100  # reports generated per validation epoch (0 = disable).
+                           # Bumped from 50 — gives stabler ROUGE/BERTScore estimates
+                           # across ~380 val samples without much extra wall-time.
 
 wandb:
   project: ${oc.env:WANDB_PROJECT,ct-gen-vlm}

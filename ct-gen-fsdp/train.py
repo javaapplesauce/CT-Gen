@@ -540,7 +540,8 @@ def train_stage1(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
     )
     optimizer = AdamW(projector.parameters(), lr=s1.lr, weight_decay=0.01)
 
-    total_steps  = s1.epochs * (n_train // (s1.accum_steps * accelerator.num_processes))
+    steps_per_epoch = n_train // (s1.batch_size * s1.accum_steps * accelerator.num_processes)
+    total_steps  = s1.epochs * max(1, steps_per_epoch)
     warmup_steps = max(1, total_steps // 10)
     scheduler    = get_cosine_schedule_with_warmup(
         optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps,
@@ -693,15 +694,21 @@ def train_stage2(cfg, accelerator, visual_encoder, projector, llm, tokenizer,
         val_split=cfg.data.val_split, num_workers=cfg.data.num_workers,
     )
 
+    # LoRA LR defaults to projector_lr × 0.1 for backward compatibility, but
+    # can be overridden via stage2.lora_lr.
+    lora_lr = getattr(s2, "lora_lr", None)
+    if lora_lr is None:
+        lora_lr = s2.lr * 0.1
     optimizer = AdamW(
         [
             {"params": projector.parameters(), "lr": s2.lr},
-            {"params": lora_params,            "lr": s2.lr * 0.1},
+            {"params": lora_params,            "lr": lora_lr},
         ],
         weight_decay=0.01,
     )
 
-    total_steps  = s2.epochs * (n_train // (s2.accum_steps * accelerator.num_processes))
+    steps_per_epoch = n_train // (s2.batch_size * s2.accum_steps * accelerator.num_processes)
+    total_steps  = s2.epochs * max(1, steps_per_epoch)
     warmup_steps = max(1, total_steps // 10)
     scheduler    = get_cosine_schedule_with_warmup(
         optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps,
